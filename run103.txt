@@ -1,148 +1,42 @@
+from flask import Flask
 import base64
-import sys
-import time
-import json
 import requests
-import re
 from datetime import datetime
-sys.path.append('..')
-from base.spider import Spider
 
-class Spider(Spider):
-    def getName(self):
-        return "ITV"
+app = Flask(__name__)  # 必须存在这个实例，并且名称为 `app`
 
-    def init(self, extend):
-        self.extend = extend
-        try:
-            self.extendDict = json.loads(extend)
-        except:
-            self.extendDict = {}
+class Spider:
+    def __init__(self):
+        self.proxy = None
 
-        proxy = self.extendDict.get('proxy', None)
-        if proxy is None:
-            self.is_proxy = False
-        else:
-            self.proxy = proxy
-            self.is_proxy = True
-
-    def getDependence(self):
-        return []
-
-    def isVideoFormat(self, url):
-        pass
-
-    def manualVideoCheck(self):
-        pass
-
-    def liveContent(self, url):
+    def liveContent(self):
         m3u_content = ['#EXTM3U']
-        
         try:
-            # ITV API endpoint (假设的URL)
-            api_url = "https://gslbserv.itv.cmvideo.cn:80/live/list?pageSize=50&pageNumber=1&sort=time"
-            headers = {
-                "User-Agent": "Mozilla/5.0",
-                "Accept": "application/json"
-            }
-            response = requests.get(api_url, headers=headers, timeout=10)
-            response.raise_for_status()
+            api_url = "https://api.itv.example/live/list?pageSize=50&pageNumber=1&sort=time"
+            response = requests.get(api_url, timeout=10)
             data = response.json()
 
             for item in data.get("data", {}).get("list", []):
-                # ITV字段结构假设
-                hteam = item.get("home_team", "Unknown Home")
-                ateam = item.get("away_team", "Unknown Away")
-                event_name = item.get("event_name", "Unnamed Event")
-                start_time = item.get("start_time", "Unknown Time")
-                status = item.get("status", "Unknown Status")
-                
+                hteam = item.get("home_team", "Unknown")
+                ateam = item.get("away_team", "Unknown")
+                event_name = item.get("event_name", "Unnamed")
+                start_time = item.get("start_time", "Unknown")
+                status = item.get("status", "Live")
                 stream_url = item.get("stream_url", "")
-                if not stream_url:
-                    continue
 
-                # 构造EXTINF标签
-                tvg_name = f"{event_name}({hteam}-{ateam}){status}{start_time}"
-                group_title = event_name
-                extinf = f'#EXTINF:-1 tvg-name="{tvg_name}" group-title="{group_title}",{hteam}-{ateam} {status} {start_time}'
-                m3u_content.extend([extinf, stream_url])
+                if stream_url:
+                    extinf = f'#EXTINF:-1 tvg-name="{event_name}" group-title="{event_name}",{hteam} vs {ateam} {status}'
+                    m3u_content.extend([extinf, stream_url])
 
-        except requests.exceptions.RequestException as e:
-            print(f"Network error: {str(e)}")
-            m3u_content.append('# 错误：无法获取直播数据')
-        except json.JSONDecodeError:
-            print("Invalid JSON response")
-            m3u_content.append('# 错误：无效的API响应格式')
         except Exception as e:
-            print(f"Unknown error: {str(e)}")
-            m3u_content.append('# 错误：数据处理异常')
+            m3u_content.append(f'# Error: {str(e)}')
 
         return '\n'.join(m3u_content)
 
-    # 其他方法保持不变，除非需要调整TS代理路径
-    def proxyM3u8(self, params):
-        pid = params['pid']
-        info = pid.split(',')
-        a = info[0]
-        b = info[1]
-        c = info[2]
-        timestamp = int(time.time() / 4 - 355017625)
-        t = timestamp * 4
-        m3u8_text = f'#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:4\n#EXT-X-MEDIA-SEQUENCE:{timestamp}\n'
-        for i in range(10):
-            # ITV的TS路径结构（假设）
-            url = f'https://cdn.itv.example/live/{a}/{a}-avc1_6000000={b}-mp4a_134000_zho={c}-begin={t}0000000-dur=40000000-seq={timestamp}.ts'
-            if self.is_proxy:
-                url = f'http://127.0.0.1:9978/proxy?do=py&type=ts&url={self.b64encode(url)}'
-
-            m3u8_text += f'#EXTINF:4,\n{url}\n'
-            timestamp += 1
-            t += 4
-        return [200, "application/vnd.apple.mpegurl", m3u8_text]
-
-    # 其他方法保持不变
-    def homeContent(self, filter):
-        return {}
-
-    def homeVideoContent(self):
-        return {}
-
-    def categoryContent(self, cid, page, filter, ext):
-        return {}
-
-    def detailContent(self, did):
-        return {}
-
-    def searchContent(self, key, quick, page='1'):
-        return {}
-
-    def searchContentPage(self, keywords, quick, page):
-        return {}
-
-    def playerContent(self, flag, pid, vipFlags):
-        return {}
-
-    def localProxy(self, params):
-        if params['type'] == "m3u8":
-            return self.proxyM3u8(params)
-        if params['type'] == "ts":
-            return self.get_ts(params)
-        return [302, "text/plain", None, {'Location': 'https://sf1-cdn-tos.huoshanstatic.com/obj/media-fe/xgplayer_doc_video/mp4/xgplayer-demo-720p.mp4'}]
-
-    def get_ts(self, params):
-        url = self.b64decode(params['url'])
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, stream=True, proxies=self.proxy)
-        return [206, "application/octet-stream", response.content]
-
-    def destroy(self):
-        return '正在Destroy'
-
-    def b64encode(self, data):
-        return base64.b64encode(data.encode('utf-8')).decode('utf-8')
-
-    def b64decode(self, data):
-        return base64.b64decode(data.encode('utf-8')).decode('utf-8')
+@app.route('/live.m3u8')  # 示例路由
+def get_live_m3u8():
+    spider = Spider()
+    return spider.liveContent(), 200, {'Content-Type': 'application/vnd.apple.mpegurl'}
 
 if __name__ == '__main__':
-    pass
+    app.run()  # 开发环境测试
