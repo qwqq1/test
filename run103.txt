@@ -5,42 +5,6 @@ import logging
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-class Spider:
-    def __init__(self):
-        self.proxy = None
-
-    def liveContent(self):
-        m3u_content = ['#EXTM3U']
-        try:
-            api_url = "https://gslbserv.itv.cmvideo.cn:80/live/list?pageSize=50&pageNumber=1&sort=time"
-            response = requests.get(api_url, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            live_list = data.get("data", {}).get("list", [])
-
-            if not live_list:
-                app.logger.warning("API 返回数据为空")
-                m3u_content.append("#EXT-X-ERROR: No live streams available")
-
-            for item in live_list:
-                hteam = item.get("home_team", "Unknown")
-                ateam = item.get("away_team", "Unknown")
-                event_name = item.get("event_name", "Unnamed Event")
-                status = item.get("status", "Live")
-                stream_url = item.get("stream_url", "")
-                if stream_url:
-                    extinf = f'#EXTINF:-1 tvg-name="{event_name}" group-title="{event_name}",{hteam} vs {ateam} {status}'
-                    m3u_content.extend([extinf, stream_url])
-        except Exception as e:
-            app.logger.error(f"API 请求失败: {str(e)}")
-            m3u_content.append("#EXT-X-ERROR: Failed to retrieve live streams")
-        return '\n'.join(m3u_content)
-
-@app.route('/live.m3u8')
-def get_live_m3u8():
-    spider = Spider()
-    content = spider.liveContent()
-    return Response(content, mimetype="application/vnd.apple.mpegurl")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
