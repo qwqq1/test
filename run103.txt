@@ -3,7 +3,7 @@ import base64
 import requests
 from datetime import datetime
 
-app = Flask(__name__)
+app.py = Flask(__name__)
 
 class Spider:
     def __init__(self):
@@ -33,7 +33,7 @@ class Spider:
 
         return '\n'.join(m3u_content)
 
-@app.route('/live.m3u8')  # 示例路由
+@app.route('/itv.m3u')  # 示例路由
 def get_live_m3u8():
     spider = Spider()
     return spider.liveContent(), 200, {'Content-Type': 'application/vnd.apple.mpegurl'}
