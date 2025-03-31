@@ -3,7 +3,7 @@ import base64
 import requests
 from datetime import datetime
 
-app = Flask(__name__)  # 必须存在这个实例，并且名称为 `app`
+app = Flask(__name__)
 
 class Spider:
     def __init__(self):
@@ -12,7 +12,7 @@ class Spider:
     def liveContent(self):
         m3u_content = ['#EXTM3U']
         try:
-            api_url = "https://api.itv.example/live/list?pageSize=50&pageNumber=1&sort=time"
+            api_url = "https://gslbserv.itv.cmvideo.cn:80/live/list?pageSize=50&pageNumber=1&sort=time"
             response = requests.get(api_url, timeout=10)
             data = response.json()
 
